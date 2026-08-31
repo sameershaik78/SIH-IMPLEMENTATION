@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberRisk AI — Risk Quantification & Investment Optimization</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- Custom Style -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block head %}{% endblock %}
+</head>
+<body class="cyber-theme">
+
+    <div class="d-flex" id="wrapper">
+        <!-- Sidebar -->
+        <div class="border-end border-dark" id="sidebar-wrapper">
+            <div class="sidebar-heading border-bottom border-dark text-center">
+                <i class="fa-solid fa-shield-halved text-info me-2 fs-4"></i>
+                <span class="logo-text">CyberRisk <span class="text-info">AI</span></span>
+            </div>
+            
+            <!-- User Status Card -->
+            <div class="user-card text-center p-3 border-bottom border-dark">
+                <div class="avatar-circle mx-auto mb-2">
+                    <i class="fa-solid fa-user-shield text-info"></i>
+                </div>
+                <div class="username fw-bold text-light">{{ session.username }}</div>
+                <div class="role badge bg-dark-cyan text-info mt-1">{{ session.user_role }}</div>
+            </div>
+
+            <div class="list-group list-group-flush">
+                <a href="{{ url_for('dashboard_page') }}" class="list-group-item list-group-item-action {% if request.path == '/dashboard' %}active{% endif %}">
+                    <i class="fa-solid fa-chart-line me-3"></i>Dashboard
+                </a>
+                <a href="{{ url_for('assets_page') }}" class="list-group-item list-group-item-action {% if request.path == '/assets' %}active{% endif %}">
+                    <i class="fa-solid fa-server me-3"></i>Assets
+                </a>
+                <a href="{{ url_for('vulnerabilities_page') }}" class="list-group-item list-group-item-action {% if request.path == '/vulnerabilities' %}active{% endif %}">
+                    <i class="fa-solid fa-bug me-3"></i>Vulnerabilities
+                </a>
+                <a href="{{ url_for('threats_page') }}" class="list-group-item list-group-item-action {% if request.path == '/threats' %}active{% endif %}">
+                    <i class="fa-solid fa-skull-crossbones me-3"></i>Threats
+                </a>
+                <a href="{{ url_for('controls_page') }}" class="list-group-item list-group-item-action {% if request.path == '/controls' %}active{% endif %}">
+                    <i class="fa-solid fa-sliders me-3"></i>Security Controls
+                </a>
+                <a href="{{ url_for('risks_page') }}" class="list-group-item list-group-item-action {% if request.path == '/risks' %}active{% endif %}">
+                    <i class="fa-solid fa-chart-pie me-3"></i>Risk Analysis
+                </a>
+                <a href="{{ url_for('optimizer_page') }}" class="list-group-item list-group-item-action {% if request.path == '/optimizer' %}active{% endif %}">
+                    <i class="fa-solid fa-scale-balanced me-3"></i>Investment Optimizer
+                </a>
+                <a href="{{ url_for('alerts_page') }}" class="list-group-item list-group-item-action {% if request.path == '/alerts' %}active{% endif %}">
+                    <i class="fa-solid fa-bell me-3"></i>Alerts 
+                    <span id="sidebar-alert-badge" class="badge rounded-pill bg-danger float-end d-none">0</span>
+                </a>
+                <a href="{{ url_for('reports_page') }}" class="list-group-item list-group-item-action {% if request.path == '/reports' %}active{% endif %}">
+                    <i class="fa-solid fa-file-invoice me-3"></i>Executive Reports
+                </a>
+                <a href="{{ url_for('settings_page') }}" class="list-group-item list-group-item-action {% if request.path == '/settings' %}active{% endif %}">
+                    <i class="fa-solid fa-cog me-3"></i>System Controls
+                </a>
+            </div>
+        </div>
+        <!-- /#sidebar-wrapper -->
+
+        <!-- Page Content -->
+        <div id="page-content-wrapper">
+            <nav class="navbar navbar-expand-lg navbar-dark border-bottom border-dark px-4 py-3">
+                <div class="container-fluid">
+                    <button class="btn btn-outline-info border-dark me-3" id="menu-toggle">
+                        <i class="fa-solid fa-bars"></i>
+                    </button>
+                    
+                    <span class="navbar-brand me-auto fw-bold text-light d-none d-sm-inline">ABC Financial Services Corporation</span>
+                    
+                    <div class="d-flex align-items-center">
+                        <span class="text-muted text-sm me-3 d-none d-md-inline">Risk Matrix: Continuous Monitoring Active</span>
+                        <div class="pulse-green me-3"></div>
+                        <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm border-dark">
+                            <i class="fa-solid fa-right-from-bracket me-2"></i>Sign Out
+                        </a>
+                    </div>
+                </div>
+            </nav>
+
+            <div class="container-fluid p-4">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+        <!-- /#page-content-wrapper -->
+    </div>
+    <!-- /#wrapper -->
+
+    <!-- Toast Notification Container -->
+    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1100">
+        <div id="liveToast" class="toast align-items-center text-white bg-dark border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body" id="toastMessage">
+                    Alert raised.
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <script>
+        // Formatting Helpers
+        function formatRupees(value) {
+            return new Intl.NumberFormat('en-IN', {
+                style: 'currency',
+                currency: 'INR',
+                maximumFractionDigits: 0
+            }).format(value);
+        }
+
+        function formatPercent(value) {
+            return parseFloat(value).toFixed(1) + '%';
+        }
+
+        // Sidebar toggle
+        document.getElementById('menu-toggle').addEventListener('click', function(e) {
+            e.preventDefault();
+            document.getElementById('wrapper').classList.toggle('toggled');
+        });
+
+        // Global Alert Badge updater
+        async function updateAlertBadge() {
+            try {
+                const response = await fetch('/api/alerts');
+                const data = await response.json();
+                const unread = data.filter(a => a.status === 'Unread');
+                const badge = document.getElementById('sidebar-alert-badge');
+                if (unread.length > 0) {
+                    badge.innerText = unread.length;
+                    badge.classList.remove('d-none');
+                } else {
+                    badge.classList.add('d-none');
+                }
+            } catch (err) {
+                console.error("Failed to fetch alerts count", err);
+            }
+        }
+        
+        // Show notification toast
+        function showToast(message, type = 'success') {
+            const toastEl = document.getElementById('liveToast');
+            const body = document.getElementById('toastMessage');
+            body.innerText = message;
+            
+            toastEl.classList.remove('bg-success', 'bg-danger', 'bg-warning', 'bg-info');
+            if (type === 'success') toastEl.classList.add('bg-success');
+            else if (type === 'danger') toastEl.classList.add('bg-danger');
+            else if (type === 'warning') toastEl.classList.add('bg-warning');
+            else toastEl.classList.add('bg-info');
+            
+            const toast = new bootstrap.Toast(toastEl);
+            toast.show();
+        }
+
+        // Initialize alert badge
+        updateAlertBadge();
+        // Periodically pull alerts badge (continuous monitoring simulation)
+        setInterval(updateAlertBadge, 15000);
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

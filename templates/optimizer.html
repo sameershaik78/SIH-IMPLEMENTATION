@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h2 logo-text text-light">Cybersecurity Investment Optimizer</h1>
+        <p class="text-muted">Optimize your security budget to achieve maximum risk reduction and financial return on investment.</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Left Column: Inputs & Summary -->
+    <div class="col-12 col-xl-4">
+        <!-- Budget Input Card -->
+        <div class="cyber-card p-4 mb-4">
+            <h5 class="logo-text text-light mb-3"><i class="fa-solid fa-wallet text-info me-2"></i>Enter Budget</h5>
+            <form id="optimizer-form" onsubmit="runOptimization(event)">
+                <div class="mb-3">
+                    <label for="input-budget" class="cyber-label">Cybersecurity Budget (INR ₹)</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-dark border-dark text-info fw-bold">₹</span>
+                        <input type="number" class="form-control cyber-input text-lg fw-bold text-info" id="input-budget" required min="10000" value="1000000" placeholder="e.g. 1000000">
+                    </div>
+                    <small class="text-muted mt-1 d-block">Recommended demo budget: ₹10,00,000</small>
+                </div>
+                <button type="submit" class="btn btn-info border-dark w-100 py-2 fw-semibold text-uppercase" id="btn-optimize">
+                    <i class="fa-solid fa-bolt me-2"></i>Optimize Security Budget
+                </button>
+            </form>
+        </div>
+
+        <!-- Optimization Impact Card -->
+        <div class="cyber-card p-4" id="optimization-summary-card">
+            <h5 class="logo-text text-light mb-3"><i class="fa-solid fa-chart-line text-info me-2"></i>Impact Summary</h5>
+            
+            <div class="d-flex flex-column gap-3 text-sm">
+                <div class="d-flex justify-content-between border-bottom border-dark pb-2">
+                    <span class="text-muted">Total Investment Cost:</span>
+                    <span class="fw-bold text-info" id="opt-cost">₹0</span>
+                </div>
+                <div class="d-flex justify-content-between border-bottom border-dark pb-2">
+                    <span class="text-muted">Expected Loss Before:</span>
+                    <span class="fw-bold text-danger" id="opt-loss-before">₹0</span>
+                </div>
+                <div class="d-flex justify-content-between border-bottom border-dark pb-2">
+                    <span class="text-muted">Expected Loss After:</span>
+                    <span class="fw-bold text-success" id="opt-loss-after">₹0</span>
+                </div>
+                <div class="d-flex justify-content-between border-bottom border-dark pb-2">
+                    <span class="text-muted">Total Financial Reduction:</span>
+                    <span class="fw-bold text-success" id="opt-reduction-val">₹0</span>
+                </div>
+                <div class="d-flex justify-content-between border-bottom border-dark pb-2">
+                    <span class="text-muted">Risk Reduction Percentage:</span>
+                    <span class="fw-bold text-success" id="opt-reduction-pct">0.0%</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted">Return on Investment (ROI):</span>
+                    <span class="badge bg-success fs-6" id="opt-roi">0.0%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Right Column: Comparative Charts & Recommendations Table -->
+    <div class="col-12 col-xl-8">
+        <!-- Before vs After Charts -->
+        <div class="cyber-card p-4 mb-4">
+            <h5 class="logo-text text-light mb-3"><i class="fa-solid fa-chart-column text-info me-2"></i>Security Posture: Before vs After Investment</h5>
+            <div class="row g-3">
+                <div class="col-12 col-md-6">
+                    <div style="position: relative; height: 220px;">
+                        <canvas id="chart-before-after-risk"></canvas>
+                    </div>
+                </div>
+                <div class="col-12 col-md-6">
+                    <div style="position: relative; height: 220px;">
+                        <canvas id="chart-before-after-loss"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Recommended Controls Table -->
+        <div class="cyber-card p-4">
+            <h5 class="logo-text text-light mb-3"><i class="fa-solid fa-list-check text-info me-2"></i>Recommended Defensive Investments</h5>
+            <p class="text-muted text-sm">Optimal combination of security controls matching the specified budget, solved using binary knapsack algorithms.</p>
+            
+            <div class="table-responsive">
+                <table class="table table-dark table-hover table-cyber text-sm">
+                    <thead>
+                        <tr>
+                            <th>Defensive Control</th>
+                            <th>Cost (INR)</th>
+                            <th>Efficacy</th>
+                            <th>Reduction</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="opt-controls-table-body">
+                        <tr>
+                            <td colspan="5" class="text-center py-4 text-muted">Enter a budget and run the optimizer to view recommendations.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Explainable Recommendation Rationale -->
+            <div class="mt-4 d-none" id="opt-rationale-box">
+                <h6 class="logo-text text-light mb-2"><i class="fa-solid fa-brain text-info me-2"></i>AI Recommendation Rationale</h6>
+                <div class="p-3 bg-darker rounded border border-dark text-muted text-sm" id="opt-rationale-text">
+                    These controls provide the highest estimated risk reduction within the available cybersecurity budget.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let riskChart = null;
+    let lossChart = null;
+
+    async function runOptimization(e) {
+        e.preventDefault();
+        
+        const budget = parseFloat(document.getElementById('input-budget').value);
+        const btn = document.getElementById('btn-optimize');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Optimizing Budget Allocation...';
+        
+        try {
+            const response = await fetch('/api/optimize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ budget: budget })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                showToast("Security investment optimization successful!", 'success');
+                displayResults(data);
+            } else {
+                showToast(data.error || "Optimization failed.", 'danger');
+            }
+        } catch (err) {
+            console.error(err);
+            showToast("Network error running optimizer.", 'danger');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-bolt me-2"></i>Optimize Security Budget';
+        }
+    }
+
+    function displayResults(data) {
+        // 1. Populate summary cards
+        document.getElementById('opt-cost').innerText = formatRupees(data.investment_cost);
+        document.getElementById('opt-loss-before').innerText = formatRupees(data.expected_loss_before);
+        document.getElementById('opt-loss-after').innerText = formatRupees(data.expected_loss_after);
+        
+        const lossReduction = Math.max(0, data.expected_loss_before - data.expected_loss_after);
+        document.getElementById('opt-reduction-val').innerText = formatRupees(lossReduction);
+        document.getElementById('opt-reduction-pct').innerText = formatPercent(data.risk_reduction_pct);
+        
+        const roiBadge = document.getElementById('opt-roi');
+        roiBadge.innerText = formatPercent(data.roi);
+        if (data.roi >= 0) {
+            roiBadge.className = "badge bg-success fs-6";
+        } else {
+            roiBadge.className = "badge bg-danger fs-6";
+        }
+        
+        // 2. Populate recommendations table
+        const body = document.getElementById('opt-controls-table-body');
+        body.innerHTML = '';
+        
+        if (data.recommended_controls.length === 0) {
+            body.innerHTML = '<tr><td colspan="5" class="text-center py-3 text-muted">No controls recommended for this budget constraint. Try raising the budget.</td></tr>';
+            document.getElementById('opt-rationale-box').classList.add('d-none');
+            return;
+        }
+        
+        data.recommended_controls.forEach(c => {
+            const cost = c.implementation_cost + c.maintenance_cost;
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong class="text-light">${c.name}</strong><br><small class="text-muted text-xs">${c.category}</small></td>
+                <td>${formatRupees(cost)}</td>
+                <td>${formatPercent(c.effectiveness)}</td>
+                <td><span class="text-success"><i class="fa-solid fa-arrow-down-long me-1"></i>${formatPercent(c.risk_reduction_factor)}</span></td>
+                <td><span class="badge bg-success text-white"><i class="fa-solid fa-check me-1"></i>Recommended</span></td>
+            `;
+            body.appendChild(tr);
+        });
+
+        // Update Rationale
+        document.getElementById('opt-rationale-box').classList.remove('d-none');
+        const controlNames = data.recommended_controls.map(c => `<li><strong>${c.name}</strong>: provides ${c.risk_reduction_factor}% risk mitigation at a cost of ${formatRupees(c.implementation_cost + c.maintenance_cost)}.</li>`).join('');
+        document.getElementById('opt-rationale-text').innerHTML = `
+            <p class="mb-2">The optimizer selected a subset of controls that maximize the organization's security posture reduction within the ₹${document.getElementById('input-budget').value} budget constraint:</p>
+            <ul class="mb-2 ps-3">${controlNames}</ul>
+            <p class="mb-0 text-success fw-semibold">This configuration reduces overall expected loss from ${formatRupees(data.expected_loss_before)} down to ${formatRupees(data.expected_loss_after)}, yielding a positive ROI of ${data.roi.toFixed(1)}%.</p>
+        `;
+        
+        // 3. Draw comparative charts
+        renderBeforeAfterCharts(data);
+    }
+
+    function renderBeforeAfterCharts(data) {
+        // Average Risk Chart
+        const riskCtx = document.getElementById('chart-before-after-risk').getContext('2d');
+        if (riskChart) riskChart.destroy();
+        
+        riskChart = new Chart(riskCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Before Investment', 'After Investment'],
+                datasets: [{
+                    label: 'Avg Risk Score (0-100)',
+                    data: [data.avg_risk_before, data.avg_risk_after],
+                    backgroundColor: ['rgba(220, 53, 69, 0.5)', 'rgba(25, 135, 84, 0.5)'],
+                    borderColor: ['#dc3545', '#198754'],
+                    borderWidth: 1.5,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    title: { display: true, text: 'Average Risk Score Index', color: '#cfd7e6' }
+                },
+                scales: {
+                    y: { grid: { color: '#16233d' }, min: 0, max: 100, ticks: { color: '#8c9cb6' } },
+                    x: { ticks: { color: '#8c9cb6' } }
+                }
+            }
+        });
+
+        // Expected Loss Chart
+        const lossCtx = document.getElementById('chart-before-after-loss').getContext('2d');
+        if (lossChart) lossChart.destroy();
+        
+        lossChart = new Chart(lossCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Before Investment', 'After Investment'],
+                datasets: [{
+                    label: 'Expected Loss (INR)',
+                    data: [data.expected_loss_before, data.expected_loss_after],
+                    backgroundColor: ['rgba(220, 53, 69, 0.5)', 'rgba(25, 135, 84, 0.5)'],
+                    borderColor: ['#dc3545', '#198754'],
+                    borderWidth: 1.5,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    title: { display: true, text: 'Expected Loss Exposure (INR ₹)', color: '#cfd7e6' }
+                },
+                scales: {
+                    y: {
+                        grid: { color: '#16233d' },
+                        ticks: {
+                            color: '#8c9cb6',
+                            callback: function(val) {
+                                return '₹' + (val / 100000).toFixed(0) + 'L';
+                            }
+                        }
+                    },
+                    x: { ticks: { color: '#8c9cb6' } }
+                }
+            }
+        });
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+
+{% block head %}
+<style>
+    @media print {
+        /* Hide sidebar, navbar, and print button */
+        #sidebar-wrapper, .navbar, #menu-toggle, .btn-print-action, #sidebar-alert-badge {
+            display: none !important;
+        }
+        #wrapper.toggled #sidebar-wrapper {
+            display: none !important;
+        }
+        #page-content-wrapper {
+            width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+        .cyber-card {
+            border: 1px solid #000000 !important;
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            box-shadow: none !important;
+        }
+        body.cyber-theme {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+        }
+        .logo-text, h3, h5, p, span, td, th {
+            color: #000000 !important;
+        }
+        .table-cyber th {
+            background-color: #f2f2f2 !important;
+            border-bottom: 1px solid #000000 !important;
+        }
+        .table-cyber td {
+            border-bottom: 1px solid #cccccc !important;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 btn-print-action">
+    <div>
+        <h1 class="h2 logo-text text-light">Executive Risk Reports</h1>
+        <p class="text-muted">Generate printable audit reports on overall organizational security posture.</p>
+    </div>
+    <div>
+        <button class="btn btn-info border-dark" onclick="window.print()">
+            <i class="fa-solid fa-print me-2"></i>Print / Export PDF
+        </button>
+    </div>
+</div>
+
+<div class="cyber-card p-4" id="report-container">
+    <!-- Report Header -->
+    <div class="text-center border-bottom border-dark pb-4 mb-4">
+        <h2 class="logo-text text-light">CyberRisk AI Audit Report</h2>
+        <h5 class="text-muted">Executive Risk Summary & Strategic Security Posture</h5>
+        <div class="text-xs text-muted mt-2">
+            Generated on: <span id="report-date">--</span> | Scope: ABC Financial Services Corp
+        </div>
+    </div>
+    
+    <!-- Executive KPI Grid -->
+    <div class="row g-3 mb-4">
+        <div class="col-4 text-center border-end border-dark">
+            <div class="text-muted text-xs text-uppercase mb-1">Overall Risk Score</div>
+            <h3 class="kpi-val text-danger" id="rep-risk-score">--/100</h3>
+        </div>
+        <div class="col-4 border-end border-dark text-center">
+            <div class="text-muted text-xs text-uppercase mb-1">Total Expected Loss</div>
+            <h3 class="kpi-val text-warning" id="rep-expected-loss">₹0</h3>
+        </div>
+        <div class="col-4 text-center">
+            <div class="text-muted text-xs text-uppercase mb-1">Critical Vulnerabilities</div>
+            <h3 class="kpi-val text-info" id="rep-crit-vulns">0</h3>
+        </div>
+    </div>
+
+    <!-- Section 1: Top Asset Risks -->
+    <div class="mb-4 pt-3 border-top border-dark">
+        <h5 class="logo-text text-light mb-3"><i class="fa-solid fa-triangle-exclamation text-danger me-2"></i>Top 5 Critical Risk Assets</h5>
+        <div class="table-responsive">
+            <table class="table table-dark table-hover table-cyber text-sm">
+                <thead>
+                    <tr>
+                        <th>Asset Name</th>
+                        <th>Category</th>
+                        <th>Criticality</th>
+                        <th>Risk Score</th>
+                        <th>Expected Loss</th>
+                    </tr>
+                </thead>
+                <tbody id="rep-assets-body">
+                    <tr>
+                        <td colspan="5" class="text-center py-3 text-muted">Loading asset risks...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Section 2: Active Vulnerabilities -->
+    <div class="mb-4 pt-3 border-top border-dark">
+        <h5 class="logo-text text-light mb-3"><i class="fa-solid fa-bug text-warning me-2"></i>Critical & High Unpatched CVEs</h5>
+        <div class="table-responsive">
+            <table class="table table-dark table-hover table-cyber text-sm">
+                <thead>
+                    <tr>
+                        <th>CVE ID</th>
+                        <th>Affected Asset</th>
+                        <th>CVSS Score</th>
+                        <th>Severity</th>
+                        <th>Exploit Status</th>
+                    </tr>
+                </thead>
+                <tbody id="rep-vulns-body">
+                    <tr>
+                        <td colspan="5" class="text-center py-3 text-muted">Loading vulnerabilities...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Section 3: Recommended Investments -->
+    <div class="mb-4 pt-3 border-top border-dark">
+        <h5 class="logo-text text-light mb-3"><i class="fa-solid fa-chart-column text-success me-2"></i>Security Investment Optimization (Target ₹10,00,000 Budget)</h5>
+        <div class="p-3 bg-darker rounded border border-dark mb-3 text-sm">
+            <p class="mb-2 text-light"><strong>Investment Impact:</strong> By allocating the optimal budget, the company achieves the following risk reductions:</p>
+            <div class="row text-center text-xs">
+                <div class="col-4 border-end border-dark">
+                    <span class="text-muted d-block mb-1">Recommended Cost</span>
+                    <strong class="text-info fs-6" id="rep-opt-cost">₹0</strong>
+                </div>
+                <div class="col-4 border-end border-dark">
+                    <span class="text-muted d-block mb-1">Risk Reduction</span>
+                    <strong class="text-success fs-6" id="rep-opt-reduction">0.0%</strong>
+                </div>
+                <div class="col-4">
+                    <span class="text-muted d-block mb-1">Estimated ROI</span>
+                    <strong class="text-success fs-6" id="rep-opt-roi">0.0%</strong>
+                </div>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-dark table-hover table-cyber text-sm">
+                <thead>
+                    <tr>
+                        <th>Recommended Control</th>
+                        <th>Cost (INR)</th>
+                        <th>Effectiveness</th>
+                        <th>Mitigation Factor</th>
+                    </tr>
+                </thead>
+                <tbody id="rep-opt-body">
+                    <tr>
+                        <td colspan="4" class="text-center py-3 text-muted">Calculating optimal control roster...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Sign-off lines -->
+    <div class="row mt-5 pt-4 text-sm text-center">
+        <div class="col-6">
+            <div class="border-top border-dark pt-2 mx-5">
+                <strong>Chief Information Security Officer</strong><br>
+                <span class="text-muted text-xs">ABC Financial Services</span>
+            </div>
+        </div>
+        <div class="col-6">
+            <div class="border-top border-dark pt-2 mx-5">
+                <strong>Lead Security Auditor</strong><br>
+                <span class="text-muted text-xs">CyberRisk AI Engine Audit</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', loadReportData);
+
+    async function loadReportData() {
+        // Set date
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+        document.getElementById('report-date').innerText = new Date().toLocaleDateString('en-IN', options);
+
+        try {
+            // 1. Fetch KPI Metrics
+            const dashResponse = await fetch('/api/dashboard');
+            const dash = await dashResponse.json();
+            
+            document.getElementById('rep-risk-score').innerText = Math.round(dash.overall_risk_score) + '/100';
+            document.getElementById('rep-expected-loss').innerText = formatRupees(dash.total_expected_loss);
+            document.getElementById('rep-crit-vulns').innerText = dash.critical_vulnerabilities;
+
+            // 2. Fetch Top Assets
+            const risksResponse = await fetch('/api/risks');
+            const risks = await risksResponse.json();
+            const topAssets = risks.slice(0, 5); // Take top 5
+            
+            const assetsBody = document.getElementById('rep-assets-body');
+            assetsBody.innerHTML = '';
+            topAssets.forEach(a => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${a.asset_name}</strong></td>
+                    <td>${a.asset_type}</td>
+                    <td>${a.criticality}</td>
+                    <td><span class="fw-bold">${Math.round(a.risk_score)}/100</span></td>
+                    <td class="text-warning">${formatRupees(a.expected_loss)}</td>
+                `;
+                assetsBody.appendChild(tr);
+            });
+
+            // 3. Fetch Vulnerabilities
+            const vulnsResponse = await fetch('/api/vulnerabilities');
+            const vulns = await vulnsResponse.json();
+            const criticalVulns = vulns.filter(v => !v.patch_status && v.cvss_score >= 7.0).slice(0, 5);
+            
+            const vulnsBody = document.getElementById('rep-vulns-body');
+            vulnsBody.innerHTML = '';
+            if (criticalVulns.length === 0) {
+                vulnsBody.innerHTML = '<tr><td colspan="5" class="text-center py-2 text-muted">No unpatched critical/high CVEs present.</td></tr>';
+            } else {
+                criticalVulns.forEach(v => {
+                    const exploitText = v.kev_status ? 'CISA KEV / Public' : (v.public_exploit ? 'Public exploit' : 'No public exploit');
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><code class="text-info">${v.cve_id}</code></td>
+                        <td>${v.asset_name}</td>
+                        <td><span class="fw-bold">${v.cvss_score.toFixed(1)}</span></td>
+                        <td>${v.severity}</td>
+                        <td><small class="text-muted">${exploitText}</small></td>
+                    `;
+                    vulnsBody.appendChild(tr);
+                });
+            }
+
+            // 4. Solve Optimizer with ₹10,00,000 Budget
+            const optResponse = await fetch('/api/optimize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ budget: 1000000.0 })
+            });
+            const opt = await optResponse.json();
+            
+            document.getElementById('rep-opt-cost').innerText = formatRupees(opt.investment_cost);
+            document.getElementById('rep-opt-reduction').innerText = formatPercent(opt.risk_reduction_pct);
+            document.getElementById('rep-opt-roi').innerText = formatPercent(opt.roi);
+
+            const optBody = document.getElementById('rep-opt-body');
+            optBody.innerHTML = '';
+            if (opt.recommended_controls.length === 0) {
+                optBody.innerHTML = '<tr><td colspan="4" class="text-center py-2 text-muted">No recommendations for ₹10,00,000.</td></tr>';
+            } else {
+                opt.recommended_controls.forEach(c => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><strong>${c.name}</strong></td>
+                        <td>${formatRupees(c.implementation_cost + c.maintenance_cost)}</td>
+                        <td>${formatPercent(c.effectiveness)}</td>
+                        <td><span class="text-success"><i class="fa-solid fa-arrow-down-long me-1"></i>${formatPercent(c.risk_reduction_factor)}</span></td>
+                    `;
+                    optBody.appendChild(tr);
+                });
+            }
+
+        } catch (err) {
+            console.error("Report data load failed", err);
+            showToast("Failed to compile executive audit metrics.", "danger");
+        }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h2 logo-text text-light">Threat Landscape</h1>
+        <p class="text-muted">Monitor threat campaigns, threat actors, and attack vectors targeting corporate components.</p>
+    </div>
+    <div>
+        {% if session.user_role in ['Admin', 'Security Analyst'] %}
+        <button class="btn btn-info border-dark" data-bs-toggle="modal" data-bs-target="#threatModal" onclick="openCreateModal()">
+            <i class="fa-solid fa-plus me-2"></i>Record Active Threat
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Search & Filters -->
+<div class="cyber-card p-3 mb-4">
+    <div class="row g-3">
+        <div class="col-12 col-md-6 col-lg-4">
+            <div class="input-group">
+                <span class="input-group-text bg-dark border-dark text-muted"><i class="fa-solid fa-magnifying-glass"></i></span>
+                <input type="text" id="search-input" class="form-control cyber-input" placeholder="Search by threat name, actor, vector...">
+            </div>
+        </div>
+        <div class="col-6 col-md-3 col-lg-3">
+            <select class="form-select" id="filter-type">
+                <option value="">All Threat Types</option>
+                <option value="Ransomware">Ransomware</option>
+                <option value="Phishing">Phishing</option>
+                <option value="Malware">Malware</option>
+                <option value="DDoS">DDoS</option>
+                <option value="Credential Theft">Credential Theft</option>
+                <option value="Insider Threat">Insider Threat</option>
+                <option value="Web Attack">Web Attack</option>
+                <option value="Supply Chain Attack">Supply Chain Attack</option>
+            </select>
+        </div>
+        <div class="col-6 col-md-3 col-lg-3">
+            <select class="form-select" id="filter-severity">
+                <option value="">All Severities</option>
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+                <option value="Critical">Critical</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<!-- Table -->
+<div class="cyber-table-container">
+    <div class="table-responsive">
+        <table class="table table-dark table-hover table-cyber">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Threat Campaign</th>
+                    <th>Type</th>
+                    <th>Severity</th>
+                    <th>Likelihood (1-5)</th>
+                    <th>Frequency (1-5)</th>
+                    <th>Target Asset</th>
+                    <th>Threat Actor</th>
+                    <th>Attack Vector</th>
+                </tr>
+            </thead>
+            <tbody id="threats-table-body">
+                <tr>
+                    <td colspan="9" class="text-center py-4 text-muted"><i class="fa-solid fa-spinner fa-spin me-2"></i>Loading threat catalog...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Threat CRUD Modal -->
+<div class="modal fade" id="threatModal" tabindex="-1" aria-labelledby="threatModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title logo-text text-light" id="threatModalLabel">Record Active Threat Campaign</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="threat-form" onsubmit="saveThreat(event)">
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label for="threat-name" class="cyber-label">Campaign Name</label>
+                            <input type="text" class="form-control cyber-input" id="threat-name" required placeholder="e.g. APT Ransomware Campaign">
+                        </div>
+                        <div class="col-12">
+                            <label for="threat-type" class="cyber-label">Threat Category</label>
+                            <select class="form-select" id="threat-type" required>
+                                <option value="Ransomware">Ransomware</option>
+                                <option value="Phishing">Phishing</option>
+                                <option value="Malware">Malware</option>
+                                <option value="DDoS">DDoS</option>
+                                <option value="Credential Theft">Credential Theft</option>
+                                <option value="Insider Threat">Insider Threat</option>
+                                <option value="Web Attack">Web Attack</option>
+                                <option value="Supply Chain Attack">Supply Chain Attack</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="threat-severity" class="cyber-label">Severity Level</label>
+                            <select class="form-select" id="threat-severity" required>
+                                <option value="Low">Low</option>
+                                <option value="Medium">Medium</option>
+                                <option value="High">High</option>
+                                <option value="Critical">Critical</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="threat-asset" class="cyber-label">Target Asset</label>
+                            <select class="form-select" id="threat-asset" required>
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="threat-likelihood" class="cyber-label">Likelihood (1-5)</label>
+                            <select class="form-select" id="threat-likelihood" required>
+                                <option value="1">1 - Extremely Rare</option>
+                                <option value="2">2 - Unlikely</option>
+                                <option value="3">3 - Possible</option>
+                                <option value="4">4 - Highly Likely</option>
+                                <option value="5">5 - Frequent</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="threat-frequency" class="cyber-label">Frequency Score (1-5)</label>
+                            <select class="form-select" id="threat-frequency" required>
+                                <option value="1">1 - Low (Rarely)</option>
+                                <option value="2">2 - Med-Low</option>
+                                <option value="3">3 - Medium</option>
+                                <option value="4">4 - High (Multiple/yr)</option>
+                                <option value="5">5 - Extreme</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label for="threat-actor" class="cyber-label">Threat Actor / APT Group</label>
+                            <input type="text" class="form-control cyber-input" id="threat-actor" placeholder="e.g. LockBit 3.0, APT29">
+                        </div>
+                        <div class="col-12">
+                            <label for="threat-vector" class="cyber-label">Primary Attack Vector</label>
+                            <input type="text" class="form-control cyber-input" id="threat-vector" placeholder="e.g. Email attachment, Unpatched external port">
+                        </div>
+                        <div class="col-12">
+                            <label for="threat-desc" class="cyber-label">Description</label>
+                            <textarea class="form-control cyber-input" id="threat-desc" rows="2" placeholder="Describe the threat campaign behavior..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-info border-dark">Log Campaign</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let allThreats = [];
+    let allAssets = [];
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadThreats();
+        loadAssetsForSelect();
+        
+        document.getElementById('search-input').addEventListener('input', applyFilters);
+        document.getElementById('filter-type').addEventListener('change', applyFilters);
+        document.getElementById('filter-severity').addEventListener('change', applyFilters);
+    });
+
+    async function loadThreats() {
+        try {
+            const response = await fetch('/api/threats');
+            allThreats = await response.json();
+            renderThreatsTable(allThreats);
+        } catch (err) {
+            console.error(err);
+            showToast("Failed to fetch threat logs.", "danger");
+        }
+    }
+
+    async function loadAssetsForSelect() {
+        try {
+            const response = await fetch('/api/assets');
+            allAssets = await response.json();
+            const select = document.getElementById('threat-asset');
+            select.innerHTML = '<option value="">All Assets</option>';
+            
+            allAssets.forEach(a => {
+                const opt = document.createElement('option');
+                opt.value = a.id;
+                opt.innerText = `${a.name} (${a.type})`;
+                select.appendChild(opt);
+            });
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    function renderThreatsTable(threats) {
+        const body = document.getElementById('threats-table-body');
+        body.innerHTML = '';
+        
+        if (threats.length === 0) {
+            body.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">No threat campaigns logged.</td></tr>';
+            return;
+        }
+
+        threats.forEach(t => {
+            const severityClass = getSeverityBadgeClass(t.severity);
+            
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><code>THR-${String(t.id).padStart(3, '0')}</code></td>
+                <td><strong class="text-light">${t.name}</strong></td>
+                <td><span class="text-muted text-sm">${t.type}</span></td>
+                <td><span class="badge ${severityClass}">${t.severity}</span></td>
+                <td><span class="fw-bold">${t.likelihood}/5</span></td>
+                <td><span class="fw-bold">${t.frequency}/5</span></td>
+                <td><span class="text-info">${t.affected_asset_name}</span></td>
+                <td><code>${t.threat_actor || 'Unknown'}</code></td>
+                <td><small class="text-muted">${t.attack_vector || 'N/A'}</small></td>
+            `;
+            body.appendChild(tr);
+        });
+    }
+
+    function getSeverityBadgeClass(sev) {
+        if (sev === 'Critical') return 'badge-critical';
+        if (sev === 'High') return 'badge-high';
+        if (sev === 'Medium') return 'badge-medium';
+        return 'badge-low';
+    }
+
+    function applyFilters() {
+        const query = document.getElementById('search-input').value.toLowerCase();
+        const type = document.getElementById('filter-type').value;
+        const severity = document.getElementById('filter-severity').value;
+        
+        const filtered = allThreats.filter(t => {
+            const matchesQuery = t.name.toLowerCase().includes(query) || 
+                                 t.affected_asset_name.toLowerCase().includes(query) ||
+                                 (t.threat_actor && t.threat_actor.toLowerCase().includes(query));
+            const matchesType = type === "" || t.type === type;
+            const matchesSev = severity === "" || t.severity === severity;
+            
+            return matchesQuery && matchesType && matchesSev;
+        });
+        
+        renderThreatsTable(filtered);
+    }
+
+    function openCreateModal() {
+        document.getElementById('threat-name').value = '';
+        document.getElementById('threat-type').value = 'Ransomware';
+        document.getElementById('threat-severity').value = 'High';
+        document.getElementById('threat-asset').value = '';
+        document.getElementById('threat-likelihood').value = '3';
+        document.getElementById('threat-frequency').value = '3';
+        document.getElementById('threat-actor').value = '';
+        document.getElementById('threat-vector').value = '';
+        document.getElementById('threat-desc').value = '';
+    }
+
+    async function saveThreat(e) {
+        e.preventDefault();
+        
+        const data = {
+            name: document.getElementById('threat-name').value,
+            type: document.getElementById('threat-type').value,
+            severity: document.getElementById('threat-severity').value,
+            affected_asset_id: document.getElementById('threat-asset').value || null,
+            likelihood: parseInt(document.getElementById('threat-likelihood').value),
+            frequency: parseInt(document.getElementById('threat-frequency').value),
+            threat_actor: document.getElementById('threat-actor').value,
+            attack_vector: document.getElementById('threat-vector').value,
+            description: document.getElementById('threat-desc').value
+        };
+        
+        try {
+            const response = await fetch('/api/threats', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            
+            if (response.ok) {
+                showToast("Threat campaign logged successfully!", 'success');
+                const modalEl = document.getElementById('threatModal');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+                loadThreats();
+            } else {
+                const res = await response.json();
+                showToast(res.error || "Failed to log threat.", 'danger');
+            }
+        } catch (err) {
+            console.error(err);
+            showToast("Network error saving threat.", 'danger');
+        }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Left Sidebar: Assets list -->
+    <div class="col-12 col-lg-4">
+        <div class="cyber-card p-3 h-100 d-flex flex-column" style="max-height: 80vh;">
+            <h5 class="logo-text text-light mb-3"><i class="fa-solid fa-list-check text-info me-2"></i>Assets Risk Roster</h5>
+            <div class="input-group mb-3">
+                <span class="input-group-text bg-dark border-dark text-muted"><i class="fa-solid fa-magnifying-glass"></i></span>
+                <input type="text" id="asset-search" class="form-control cyber-input text-sm" placeholder="Filter assets...">
+            </div>
+            
+            <div class="flex-grow-1 overflow-auto" id="asset-roster-list">
+                <!-- Populated dynamically -->
+                <div class="text-muted text-center py-4"><i class="fa-solid fa-spinner fa-spin me-2"></i>Loading assets...</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Right Panel: Detailed explanation -->
+    <div class="col-12 col-lg-8">
+        <div class="cyber-card p-4 h-100" id="risk-detail-panel">
+            <div class="text-center py-5 text-muted">
+                <i class="fa-solid fa-chart-pie fs-1 mb-3 text-info opacity-50"></i>
+                <h5>Select an asset from the roster to view detailed risk explainability</h5>
+                <p class="text-sm">Includes contributing factors, incident probabilities, financial exposures, and tailored recommendations.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let assetsRoster = [];
+    let selectedAssetId = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // Parse asset_id query param if available
+        const urlParams = new URLSearchParams(window.location.search);
+        const paramId = urlParams.get('asset_id');
+        if (paramId) {
+            selectedAssetId = parseInt(paramId);
+        }
+        
+        loadRoster();
+        document.getElementById('asset-search').addEventListener('input', filterRoster);
+    });
+
+    async function loadRoster() {
+        try {
+            const response = await fetch('/api/risks');
+            assetsRoster = await response.json();
+            
+            renderRoster(assetsRoster);
+            
+            // If asset_id passed, select it. Else select highest risk asset by default.
+            if (assetsRoster.length > 0) {
+                if (selectedAssetId && assetsRoster.some(a => a.asset_id === selectedAssetId)) {
+                    selectAsset(selectedAssetId);
+                } else {
+                    selectAsset(assetsRoster[0].asset_id);
+                }
+            }
+        } catch (err) {
+            console.error(err);
+            showToast("Failed to load assets roster.", "danger");
+        }
+    }
+
+    function renderRoster(assets) {
+        const list = document.getElementById('asset-roster-list');
+        list.innerHTML = '';
+        
+        assets.forEach(a => {
+            const levelClass = getRiskLevelBadgeClass(a.risk_score);
+            const activeClass = a.asset_id === selectedAssetId ? 'bg-dark-cyan border-info' : 'bg-dark border-dark';
+            
+            const card = document.createElement('div');
+            card.className = `p-3 mb-2 rounded border-start border-3 cursor-pointer ${activeClass} d-flex justify-content-between align-items-center`;
+            card.style.borderLeftColor = getRiskColor(a.risk_score);
+            card.onclick = () => selectAsset(a.asset_id);
+            
+            card.innerHTML = `
+                <div>
+                    <div class="fw-bold text-light text-sm">${a.asset_name}</div>
+                    <small class="text-muted text-xs">${a.asset_type} | ${formatRupees(a.expected_loss)} expected loss</small>
+                </div>
+                <div class="text-end">
+                    <span class="badge ${levelClass}">${Math.round(a.risk_score)}/100</span>
+                </div>
+            `;
+            list.appendChild(card);
+        });
+    }
+
+    function getRiskColor(score) {
+        if (score <= 25) return '#198754'; // Green
+        if (score <= 50) return '#0dcaf0'; // Cyan
+        if (score <= 75) return '#ffc107'; // Yellow
+        return '#dc3545'; // Red
+    }
+
+    function getRiskLevelBadgeClass(score) {
+        if (score <= 25) return 'badge-low';
+        if (score <= 50) return 'badge-medium';
+        if (score <= 75) return 'badge-high';
+        return 'badge-critical';
+    }
+
+    function filterRoster() {
+        const query = document.getElementById('asset-search').value.toLowerCase();
+        const filtered = assetsRoster.filter(a => 
+            a.asset_name.toLowerCase().includes(query) || 
+            a.asset_type.toLowerCase().includes(query)
+        );
+        renderRoster(filtered);
+    }
+
+    async function selectAsset(id) {
+        selectedAssetId = id;
+        
+        // Highlight active roster item
+        const cards = document.getElementById('asset-roster-list').children;
+        // Re-render roster to apply highlighted active class cleanly
+        renderRoster(assetsRoster.filter(a => {
+            const query = document.getElementById('asset-search').value.toLowerCase();
+            return a.asset_name.toLowerCase().includes(query) || a.asset_type.toLowerCase().includes(query);
+        }));
+        
+        const panel = document.getElementById('risk-detail-panel');
+        panel.innerHTML = '<div class="text-center py-5 text-muted"><i class="fa-solid fa-spinner fa-spin fa-2x mb-3 text-info"></i><br>Generating risk audit explanation...</div>';
+        
+        try {
+            const response = await fetch(`/api/risks/${id}`);
+            const data = await response.json();
+            
+            renderRiskDetail(data);
+        } catch (err) {
+            console.error(err);
+            panel.innerHTML = '<div class="text-center py-5 text-danger"><i class="fa-solid fa-triangle-exclamation fa-2x mb-2"></i><br>Failed to retrieve risk details.</div>';
+        }
+    }
+
+    function renderRiskDetail(data) {
+        const panel = document.getElementById('risk-detail-panel');
+        
+        // Explainability bullets mapping
+        let bulletsHtml = '';
+        data.explanation_bullets.forEach(b => {
+            bulletsHtml += `<li class="mb-2"><i class="fa-solid fa-triangle-exclamation text-warning me-2"></i>${b}</li>`;
+        });
+
+        // Recommended Controls
+        // We will build tailored controls recommendations based on the asset type and its current weaknesses
+        let tailoredControlsHtml = '';
+        if (data.risk_score > 25) {
+            tailoredControlsHtml = `
+                <div class="mt-4">
+                    <h6 class="logo-text text-light mb-3"><i class="fa-solid fa-circle-check text-success me-2"></i>Recommended Mitigations</h6>
+                    <div class="p-3 bg-darker rounded border border-dark text-sm">
+                        <p class="mb-2">To mitigate the <strong>${data.asset_name}</strong> risk profile, we recommend implementing/updating:</p>
+                        <ul class="mb-0 text-muted ps-3">
+                            ${data.asset_type === 'Database' ? '<li>Database Encryption at Rest (saves up to 85% risk)</li><li>Automated Database Backup & DR (improves recovery SLA)</li>' : ''}
+                            ${data.asset_type === 'Web Application' ? '<li>Multi-Factor Authentication (enforces identity perimeter)</li><li>Vulnerability Management (scans application ports)</li>' : ''}
+                            ${data.asset_type === 'Server' ? '<li>Endpoint Detection & Response (EDR)</li><li>Next-Gen Firewall (filters network vector traffic)</li>' : ''}
+                            ${data.asset_type === 'Endpoint' ? '<li>Endpoint Detection & Response (EDR)</li><li>Security Awareness Training</li>' : ''}
+                            ${data.asset_type === 'Cloud Resource' ? '<li>Zero Trust Network Access (ZTNA)</li><li>Multi-Factor Authentication</li>' : ''}
+                            ${data.asset_type === 'Network Device' ? '<li>Next-Gen Firewall (NGFW)</li><li>Zero Trust Access rules</li>' : ''}
+                            ${data.asset_type === 'IoT Device' ? '<li>Zero Trust Network Access (ZTNA)</li><li>Next-Gen Firewall (NGFW)</li>' : ''}
+                            <li>Review investment configurations in the <a href="/optimizer" class="text-info text-decoration-none">Investment Optimizer</a>.</li>
+                        </ul>
+                    </div>
+                </div>
+            `;
+        }
+
+        panel.innerHTML = `
+            <div class="d-flex justify-content-between align-items-start mb-3 border-bottom border-dark pb-3">
+                <div>
+                    <span class="text-muted text-xs text-uppercase fw-semibold">${data.asset_type}</span>
+                    <h3 class="text-light fw-bold m-0">${data.asset_name}</h3>
+                </div>
+                <div class="text-end">
+                    <div class="text-muted text-xs text-uppercase mb-1">Risk Score</div>
+                    <span class="badge ${getRiskLevelBadgeClass(data.risk_score)} fs-5">${Math.round(data.risk_score)}/100</span>
+                </div>
+            </div>
+            
+            <!-- Executive Summary Row -->
+            <div class="row g-3 mb-4 text-center">
+                <div class="col-4 border-end border-dark">
+                    <div class="text-muted text-xs text-uppercase mb-1">Asset Value</div>
+                    <span class="fw-bold text-light fs-6">${formatRupees(data.asset_value)}</span>
+                </div>
+                <div class="col-4 border-end border-dark">
+                    <div class="text-muted text-xs text-uppercase mb-1">Incident Probability</div>
+                    <span class="fw-bold text-warning fs-6">${formatPercent(data.incident_probability * 100)}</span>
+                </div>
+                <div class="col-4">
+                    <div class="text-muted text-xs text-uppercase mb-1">Expected Financial Loss</div>
+                    <span class="fw-bold text-danger fs-6">${formatRupees(data.expected_loss)}</span>
+                </div>
+            </div>
+            
+            <!-- Risk Explanation Bullets -->
+            <div class="mb-4">
+                <h6 class="logo-text text-light mb-3"><i class="fa-solid fa-brain text-info me-2"></i>AI Risk Diagnostics</h6>
+                <ul class="list-unstyled text-light ps-0 mb-0">
+                    ${bulletsHtml}
+                </ul>
+            </div>
+            
+            <!-- Risk Contributing Factors (Progress Bars) -->
+            <div>
+                <h6 class="logo-text text-light mb-3"><i class="fa-solid fa-chart-simple text-info me-2"></i>Contributing Risk Factors</h6>
+                
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between text-xs mb-1">
+                        <span class="text-muted">CVSS Severity Factor:</span>
+                        <span class="text-light fw-bold">${data.factors.cvss_severity.toFixed(1)}/100</span>
+                    </div>
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar bg-danger" style="width: ${data.factors.cvss_severity}%"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between text-xs mb-1">
+                        <span class="text-muted">Asset Criticality Score:</span>
+                        <span class="text-light fw-bold">${data.factors.asset_criticality.toFixed(0)}/100</span>
+                    </div>
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar bg-warning" style="width: ${data.factors.asset_criticality}%"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between text-xs mb-1">
+                        <span class="text-muted">Internet Exposure Multiplier:</span>
+                        <span class="text-light fw-bold">${data.factors.internet_exposure.toFixed(0)}/100</span>
+                    </div>
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar bg-info" style="width: ${data.factors.internet_exposure}%"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between text-xs mb-1">
+                        <span class="text-muted">Threat Landscape Frequency:</span>
+                        <span class="text-light fw-bold">${data.factors.threat_frequency.toFixed(0)}/100</span>
+                    </div>
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar bg-danger" style="width: ${data.factors.threat_frequency}%"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between text-xs mb-1">
+                        <span class="text-muted">Security Control Coverage Gap:</span>
+                        <span class="text-light fw-bold">${data.factors.control_gap.toFixed(0)}/100</span>
+                    </div>
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar bg-secondary" style="width: ${data.factors.control_gap}%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tailored Recommendations -->
+            ${tailoredControlsHtml}
+        `;
+    }
+</script>
+{% endblock %}

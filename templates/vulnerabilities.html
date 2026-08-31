@@ -1,0 +1,338 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h2 logo-text text-light">Vulnerability Ledger</h1>
+        <p class="text-muted">Monitor and track vulnerabilities mapped to specific corporate assets.</p>
+    </div>
+    <div>
+        {% if session.user_role in ['Admin', 'Security Analyst'] %}
+        <button class="btn btn-info border-dark" data-bs-toggle="modal" data-bs-target="#vulnModal" onclick="openCreateModal()">
+            <i class="fa-solid fa-plus me-2"></i>Record Vulnerability
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Search & Filters -->
+<div class="cyber-card p-3 mb-4">
+    <div class="row g-3">
+        <div class="col-12 col-md-6 col-lg-4">
+            <div class="input-group">
+                <span class="input-group-text bg-dark border-dark text-muted"><i class="fa-solid fa-magnifying-glass"></i></span>
+                <input type="text" id="search-input" class="form-control cyber-input" placeholder="Search by CVE, asset name...">
+            </div>
+        </div>
+        <div class="col-6 col-md-3 col-lg-3">
+            <select class="form-select" id="filter-severity">
+                <option value="">All Severities</option>
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+                <option value="Critical">Critical</option>
+            </select>
+        </div>
+        <div class="col-6 col-md-3 col-lg-3">
+            <select class="form-select" id="filter-status">
+                <option value="">All Statuses</option>
+                <option value="Unpatched">Unpatched Only</option>
+                <option value="Patched">Patched Only</option>
+            </select>
+        </div>
+        <div class="col-12 col-md-12 col-lg-2">
+            <button class="btn btn-outline-secondary w-100" onclick="resetFilters()">Reset Filters</button>
+        </div>
+    </div>
+</div>
+
+<!-- Table -->
+<div class="cyber-table-container">
+    <div class="table-responsive">
+        <table class="table table-dark table-hover table-cyber">
+            <thead>
+                <tr>
+                    <th>CVE ID</th>
+                    <th>Affected Asset</th>
+                    <th>CVSS Score</th>
+                    <th>Severity</th>
+                    <th>Public Exploit</th>
+                    <th>CISA KEV</th>
+                    <th>Discovered</th>
+                    <th>Patch Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="vulns-table-body">
+                <tr>
+                    <td colspan="9" class="text-center py-4 text-muted"><i class="fa-solid fa-spinner fa-spin me-2"></i>Loading vulnerabilities...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Vulnerability CRUD Modal -->
+<div class="modal fade" id="vulnModal" tabindex="-1" aria-labelledby="vulnModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title logo-text text-light" id="vulnModalLabel">Record New Vulnerability</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="vuln-form" onsubmit="saveVulnerability(event)">
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label for="vuln-cve" class="cyber-label">CVE ID</label>
+                            <input type="text" class="form-control cyber-input" id="vuln-cve" required placeholder="e.g. CVE-2023-38606">
+                        </div>
+                        <div class="col-12">
+                            <label for="vuln-asset" class="cyber-label">Affected Asset</label>
+                            <select class="form-select" id="vuln-asset" required>
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="vuln-cvss" class="cyber-label">CVSS Score (0.0 - 10.0)</label>
+                            <input type="number" class="form-control cyber-input" id="vuln-cvss" required step="0.1" min="0" max="10" placeholder="e.g. 9.8" oninput="calculateSeverity()">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="vuln-severity" class="cyber-label">Severity</label>
+                            <input type="text" class="form-control cyber-input" id="vuln-severity" readonly placeholder="Calculated from CVSS">
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="vuln-pub">
+                                <label class="form-check-label fw-semibold" for="vuln-pub">Is a public exploit exploit-code available?</label>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="vuln-kev">
+                                <label class="form-check-label fw-semibold" for="vuln-kev">Is this CVE listed in CISA KEV?</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-info border-dark">Record CVE</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let allVulns = [];
+    let allAssets = [];
+    const role = "{{ session.user_role }}";
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        loadVulns();
+        loadAssetsForSelect();
+        
+        document.getElementById('search-input').addEventListener('input', applyFilters);
+        document.getElementById('filter-severity').addEventListener('change', applyFilters);
+        document.getElementById('filter-status').addEventListener('change', applyFilters);
+    });
+
+    async function loadVulns() {
+        try {
+            const response = await fetch('/api/vulnerabilities');
+            allVulns = await response.json();
+            renderVulnsTable(allVulns);
+        } catch (err) {
+            console.error(err);
+            showToast("Failed to fetch vulnerabilities ledger.", "danger");
+        }
+    }
+
+    async function loadAssetsForSelect() {
+        try {
+            const response = await fetch('/api/assets');
+            allAssets = await response.json();
+            const select = document.getElementById('vuln-asset');
+            select.innerHTML = '';
+            
+            allAssets.forEach(a => {
+                const opt = document.createElement('option');
+                opt.value = a.id;
+                opt.innerText = `${a.name} (${a.type})`;
+                select.appendChild(opt);
+            });
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    function renderVulnsTable(vulns) {
+        const body = document.getElementById('vulns-table-body');
+        body.innerHTML = '';
+        
+        if (vulns.length === 0) {
+            body.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">No vulnerabilities found.</td></tr>';
+            return;
+        }
+
+        vulns.forEach(v => {
+            const pubBadge = v.public_exploit 
+                ? '<span class="badge bg-danger text-white"><i class="fa-solid fa-circle-exclamation me-1"></i>Active</span>'
+                : '<span class="text-muted text-sm">None</span>';
+                
+            const kevBadge = v.kev_status 
+                ? '<span class="badge bg-danger text-white"><i class="fa-solid fa-triangle-exclamation me-1"></i>Listed</span>'
+                : '<span class="text-muted text-sm">No</span>';
+
+            const severityClass = getSeverityBadgeClass(v.severity);
+            
+            // Patch Status Toggle or display
+            let patchHtml = '';
+            if (role === 'Admin' || role === 'Security Analyst') {
+                patchHtml = `
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" ${v.patch_status ? 'checked' : ''} onchange="togglePatch(${v.id}, this.checked)">
+                        <label class="form-check-label text-sm text-muted">${v.patch_status ? 'Patched' : 'Unpatched'}</label>
+                    </div>
+                `;
+            } else {
+                patchHtml = v.patch_status 
+                    ? '<span class="badge bg-success text-white">Patched</span>'
+                    : '<span class="badge bg-danger text-white">Unpatched</span>';
+            }
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><code class="text-info">${v.cve_id}</code></td>
+                <td><strong class="text-light">${v.asset_name}</strong></td>
+                <td><span class="fw-bold">${v.cvss_score.toFixed(1)}</span></td>
+                <td><span class="badge ${severityClass}">${v.severity}</span></td>
+                <td>${pubBadge}</td>
+                <td>${kevBadge}</td>
+                <td><small class="text-muted">${formatDate(v.discovered_date)}</small></td>
+                <td>${patchHtml}</td>
+                <td>
+                    <button class="btn btn-outline-info btn-sm border-dark" onclick="window.location.href='/risks?asset_id=${v.asset_id}'">
+                        <i class="fa-solid fa-magnifying-glass-chart me-1"></i>View Asset Risk
+                    </button>
+                </td>
+            `;
+            body.appendChild(tr);
+        });
+    }
+
+    function getSeverityBadgeClass(sev) {
+        if (sev === 'Critical') return 'badge-critical';
+        if (sev === 'High') return 'badge-high';
+        if (sev === 'Medium') return 'badge-medium';
+        return 'badge-low';
+    }
+
+    function formatDate(isoStr) {
+        if (!isoStr) return '';
+        const d = new Date(isoStr);
+        return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    function calculateSeverity() {
+        const cvss = parseFloat(document.getElementById('vuln-cvss').value);
+        let sev = 'Low';
+        if (cvss >= 9.0) sev = 'Critical';
+        else if (cvss >= 7.0) sev = 'High';
+        else if (cvss >= 4.0) sev = 'Medium';
+        
+        document.getElementById('vuln-severity').value = sev;
+    }
+
+    function applyFilters() {
+        const query = document.getElementById('search-input').value.toLowerCase();
+        const severity = document.getElementById('filter-severity').value;
+        const status = document.getElementById('filter-status').value;
+        
+        const filtered = allVulns.filter(v => {
+            const matchesQuery = v.cve_id.toLowerCase().includes(query) || 
+                                 v.asset_name.toLowerCase().includes(query);
+            const matchesSev = severity === "" || v.severity === severity;
+            
+            let matchesStatus = true;
+            if (status === 'Patched') matchesStatus = v.patch_status;
+            else if (status === 'Unpatched') matchesStatus = !v.patch_status;
+            
+            return matchesQuery && matchesSev && matchesStatus;
+        });
+        
+        renderVulnsTable(filtered);
+    }
+
+    function resetFilters() {
+        document.getElementById('search-input').value = '';
+        document.getElementById('filter-severity').value = '';
+        document.getElementById('filter-status').value = '';
+        renderVulnsTable(allVulns);
+    }
+
+    function openCreateModal() {
+        document.getElementById('vuln-cve').value = '';
+        document.getElementById('vuln-cvss').value = '';
+        document.getElementById('vuln-severity').value = '';
+        document.getElementById('vuln-pub').checked = false;
+        document.getElementById('vuln-kev').checked = false;
+    }
+
+    async function saveVulnerability(e) {
+        e.preventDefault();
+        
+        const data = {
+            cve_id: document.getElementById('vuln-cve').value,
+            asset_id: parseInt(document.getElementById('vuln-asset').value),
+            cvss_score: parseFloat(document.getElementById('vuln-cvss').value),
+            severity: document.getElementById('vuln-severity').value,
+            public_exploit: document.getElementById('vuln-pub').checked,
+            kev_status: document.getElementById('vuln-kev').checked
+        };
+        
+        try {
+            const response = await fetch('/api/vulnerabilities', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            
+            if (response.ok) {
+                showToast("Vulnerability logged successfully!", 'success');
+                const modalEl = document.getElementById('vulnModal');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+                loadVulns();
+            } else {
+                const res = await response.json();
+                showToast(res.error || "Failed to log vulnerability.", 'danger');
+            }
+        } catch (err) {
+            console.error(err);
+            showToast("Network error saving vulnerability.", 'danger');
+        }
+    }
+
+    async function togglePatch(id, patched) {
+        try {
+            const response = await fetch(`/api/vulnerabilities/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ patch_status: patched })
+            });
+            
+            if (response.ok) {
+                showToast(patched ? "CVE marked as patched!" : "CVE set back to unpatched.", 'success');
+                loadVulns();
+            } else {
+                showToast("Failed to toggle patch status.", 'danger');
+            }
+        } catch (err) {
+            console.error(err);
+            showToast("Network error updating patch.", 'danger');
+        }
+    }
+</script>
+{% endblock %}

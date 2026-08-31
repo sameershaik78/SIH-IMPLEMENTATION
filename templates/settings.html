@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h2 logo-text text-light">System Controls & Settings</h1>
+        <p class="text-muted">Perform continuous risk audit updates and manage machine learning pipelines.</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Risk Recalculation Card -->
+    <div class="col-12 col-md-6">
+        <div class="cyber-card p-4 h-100 d-flex flex-column justify-content-between">
+            <div>
+                <h5 class="logo-text text-light mb-3"><i class="fa-solid fa-rotate text-info me-2"></i>Trigger Risk Recalculation</h5>
+                <p class="text-muted text-sm" style="line-height:1.4;">
+                    Force the Risk Engine to run recalculations across all assets, active vulnerabilities, threat likelihoods, and active controls. 
+                    This will recalculate all Single Loss Expectancies (SLE), Annualized Loss Expectancies (ALE), and trigger active security alerts.
+                </p>
+                <div class="alert alert-info bg-dark-cyan border-0 text-info text-xs mt-3">
+                    <i class="fa-solid fa-circle-info me-2"></i>
+                    Continuous Monitoring: This is usually performed automatically in the background when assets or CVEs change.
+                </div>
+            </div>
+            <button class="btn btn-info border-dark w-100 mt-4 py-2" id="settings-btn-recalc" onclick="settingsRecalculate()">
+                <i class="fa-solid fa-rotate me-2"></i>Recalculate Database
+            </button>
+        </div>
+    </div>
+
+    <!-- ML Retraining Card -->
+    <div class="col-12 col-md-6">
+        <div class="cyber-card p-4 h-100 d-flex flex-column justify-content-between">
+            <div>
+                <h5 class="logo-text text-light mb-3"><i class="fa-solid fa-brain text-info me-2"></i>Train Random Forest Model</h5>
+                <p class="text-muted text-sm" style="line-height:1.4;">
+                    Retrain the Machine Learning classifier using historical security incidents, asset attributes, and threat logs.
+                    This updates the <code>ml/model.pkl</code> and compiles new evaluation metrics (Accuracy, Precision, Recall, F1) to show on the dashboard.
+                </p>
+                <div class="alert alert-warning bg-dark-warning border-0 text-warning text-xs mt-3">
+                    <i class="fa-solid fa-triangle-exclamation me-2"></i>
+                    This action will overwrite the existing model parameters. Only accessible by Admins.
+                </div>
+            </div>
+            <button class="btn btn-outline-warning border-dark w-100 mt-4 py-2" id="settings-btn-train" onclick="settingsTrainModel()">
+                <i class="fa-solid fa-brain me-2"></i>Train Classifier
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const role = "{{ session.user_role }}";
+
+    async function settingsRecalculate() {
+        const btn = document.getElementById('settings-btn-recalc');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Running Recalculations...';
+        
+        try {
+            const response = await fetch('/api/recalculate-risk', { method: 'POST' });
+            const data = await response.json();
+            
+            if (response.ok) {
+                showToast(data.message, 'success');
+            } else {
+                showToast(data.error || "Recalculation failed.", 'danger');
+            }
+        } catch (err) {
+            console.error(err);
+            showToast("Network error executing calculations.", 'danger');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-rotate me-2"></i>Recalculate Database';
+        }
+    }
+
+    async function settingsTrainModel() {
+        if (role !== 'Admin') {
+            showToast("Access Denied: Only Admins can train the ML model.", "danger");
+            return;
+        }
+        
+        const btn = document.getElementById('settings-btn-train');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Training RandomForest Model...';
+        
+        try {
+            const response = await fetch('/api/train-ml', { method: 'POST' });
+            const data = await response.json();
+            
+            if (response.ok) {
+                showToast(data.message, 'success');
+            } else {
+                showToast(data.error || "Training execution failed.", 'danger');
+            }
+        } catch (err) {
+            console.error(err);
+            showToast("Network error training model.", 'danger');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-brain me-2"></i>Train Classifier';
+        }
+    }
+</script>
+{% endblock %}

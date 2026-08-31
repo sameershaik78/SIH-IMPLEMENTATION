@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h2 logo-text text-light">Security Alerts</h1>
+        <p class="text-muted">Review active threat warning signs, control failures, and risk levels.</p>
+    </div>
+</div>
+
+<!-- Alerts Filters -->
+<div class="cyber-card p-3 mb-4">
+    <div class="row g-3">
+        <div class="col-6 col-md-4">
+            <select class="form-select" id="filter-severity">
+                <option value="">All Severities</option>
+                <option value="CRITICAL">Critical Only</option>
+                <option value="HIGH">High Only</option>
+                <option value="WARNING">Warning Only</option>
+                <option value="INFO">Info Only</option>
+            </select>
+        </div>
+        <div class="col-6 col-md-4">
+            <select class="form-select" id="filter-status">
+                <option value="">All Statuses</option>
+                <option value="Unread">Unread Only</option>
+                <option value="Read">Read Only</option>
+            </select>
+        </div>
+        <div class="col-12 col-md-4">
+            <button class="btn btn-outline-secondary w-100" onclick="resetFilters()">Reset Filters</button>
+        </div>
+    </div>
+</div>
+
+<!-- Alerts List -->
+<div class="d-flex flex-column gap-3" id="alerts-container">
+    <div class="text-center py-4 text-muted"><i class="fa-solid fa-spinner fa-spin me-2"></i>Loading alerts...</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let allAlerts = [];
+    const role = "{{ session.user_role }}";
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadAlerts();
+        document.getElementById('filter-severity').addEventListener('change', applyFilters);
+        document.getElementById('filter-status').addEventListener('change', applyFilters);
+    });
+
+    async function loadAlerts() {
+        try {
+            const response = await fetch('/api/alerts');
+            allAlerts = await response.json();
+            renderAlerts(allAlerts);
+        } catch (err) {
+            console.error(err);
+            showToast("Failed to retrieve system alerts.", "danger");
+        }
+    }
+
+    function renderAlerts(alerts) {
+        const container = document.getElementById('alerts-container');
+        container.innerHTML = '';
+        
+        if (alerts.length === 0) {
+            container.innerHTML = '<div class="cyber-card p-4 text-center text-muted">No security alerts found matching the active filters.</div>';
+            return;
+        }
+
+        alerts.forEach(al => {
+            let severityClass = 'badge-low';
+            let iconClass = 'fa-circle-info text-info';
+            let borderClass = 'border-info';
+            
+            if (al.severity === 'CRITICAL') {
+                severityClass = 'badge-critical';
+                iconClass = 'fa-triangle-exclamation text-danger';
+                borderClass = 'border-danger';
+            } else if (al.severity === 'HIGH') {
+                severityClass = 'badge-high';
+                iconClass = 'fa-circle-exclamation text-warning';
+                borderClass = 'border-warning';
+            } else if (al.severity === 'WARNING') {
+                severityClass = 'badge-high';
+                iconClass = 'fa-circle-exclamation text-warning';
+                borderClass = 'border-warning';
+            }
+
+            const trText = al.status === 'Read' ? 'opacity-50' : '';
+            const readBtn = (al.status === 'Unread' && (role === 'Admin' || role === 'Security Analyst')) 
+                ? `<button class="btn btn-outline-secondary btn-sm border-dark text-xs" onclick="markAsRead(${al.id})"><i class="fa-solid fa-check me-1"></i>Acknowledge</button>`
+                : '';
+
+            const card = document.createElement('div');
+            card.className = `cyber-card p-3 border-start border-4 ${borderClass} ${trText} d-flex justify-content-between align-items-center`;
+            card.innerHTML = `
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <i class="fa-solid ${iconClass}"></i>
+                        <span class="badge ${severityClass}">${al.severity}</span>
+                        <strong class="text-light">${al.title}</strong>
+                        <span class="text-muted text-xs">| ${al.asset_name}</span>
+                    </div>
+                    <p class="mb-0 text-muted text-sm">${al.message}</p>
+                    <small class="text-muted text-xs mt-1 d-block">${formatDate(al.created_at)}</small>
+                </div>
+                <div>
+                    ${readBtn}
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    function formatDate(isoStr) {
+        if (!isoStr) return '';
+        const d = new Date(isoStr);
+        return d.toLocaleDateString('en-IN') + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function applyFilters() {
+        const severity = document.getElementById('filter-severity').value;
+        const status = document.getElementById('filter-status').value;
+        
+        const filtered = allAlerts.filter(al => {
+            const matchesSev = severity === "" || al.severity === severity;
+            const matchesStatus = status === "" || al.status === status;
+            return matchesSev && matchesStatus;
+        });
+        
+        renderAlerts(filtered);
+    }
+
+    function resetFilters() {
+        document.getElementById('filter-severity').value = '';
+        document.getElementById('filter-status').value = '';
+        renderAlerts(allAlerts);
+    }
+
+    async function markAsRead(id) {
+        try {
+            const response = await fetch(`/api/alerts/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'Read' })
+            });
+            
+            if (response.ok) {
+                showToast("Alert acknowledged.", 'success');
+                loadAlerts();
+                updateAlertBadge(); // Update badge in layout
+            } else {
+                showToast("Failed to acknowledge alert.", 'danger');
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    }
+</script>
+{% endblock %}
